@@ -190,68 +190,82 @@ document.getElementById('submitQuiz').onclick=()=>{
   toast('练习记录已保存');submitted=true;
 };
 const notes=document.getElementById('readingNotes');notes.value=(data.passageNotes&&data.passageNotes[currentPassageId])||data.notes||'';notes.oninput=()=>{data.passageNotes=data.passageNotes||{};data.passageNotes[currentPassageId]=notes.value;save()};
-// Text selection toolbar: robust Range-based highlighting for mouse, touch and Apple Pencil-free reading.
-let savedSelection='',savedRange=null;
+// Unified text selection toolbar for IELTS, daily reading and imported exam passages.
+let savedSelection='',savedRange=null,savedRoot=null,savedScope='';
 const article=document.getElementById('articleText'),menu=document.getElementById('selectionMenu');
-let originalArticleHTML=article.innerHTML; renderPassage();
-menu.addEventListener('pointerdown',e=>{if(e.target.closest('button'))e.preventDefault()});
-function getTextOffset(container,offset){const r=document.createRange();r.selectNodeContents(article);try{r.setEnd(container,offset)}catch(e){return 0}return r.toString().length}
-function showMenu(){
-  const sel=window.getSelection();
-  if(!sel||sel.isCollapsed||!sel.rangeCount)return;
-  const range=sel.getRangeAt(0);
-  if(!article.contains(range.commonAncestorContainer))return;
-  const txt=sel.toString();if(!txt.trim())return;
-  savedSelection=txt;savedRange=range.cloneRange();
-  const rect=range.getBoundingClientRect();
-  menu.style.display='flex';
-  const menuWidth=Math.min(menu.offsetWidth||260,innerWidth-16);
-  menu.style.left=Math.max(8,Math.min(innerWidth-menuWidth-8,rect.left))+'px';
-  menu.style.top=Math.max(8,rect.top-48)+'px';
+let originalArticleHTML=article.innerHTML;
+function markScope(root){
+  if(root===article)return currentPassageId;
+  return root.dataset.markScope||root.id||'reading-'+(root.textContent||'').slice(0,48);
 }
-article.addEventListener('mouseup',()=>setTimeout(showMenu,0));
-article.addEventListener('touchend',()=>setTimeout(showMenu,350),{passive:true});
-document.addEventListener('selectionchange',()=>{const sel=window.getSelection();if(sel&&sel.isCollapsed){/* keep the saved range while the toolbar is used */}});
-document.addEventListener('click',e=>{if(!menu.contains(e.target)&&!article.contains(e.target))menu.style.display='none'});
+function getRootOffset(root,container,offset){
+  const r=document.createRange();r.selectNodeContents(root);
+  try{r.setEnd(container,offset)}catch(e){return -1}
+  return r.toString().length;
+}
 function pointAtTextOffset(root,target){
   const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let node,seen=0;
   while((node=walker.nextNode())){const next=seen+node.nodeValue.length;if(target<=next)return {node,offset:Math.max(0,target-seen)};seen=next}
   return null;
 }
-function applyMarks(){
-  article.innerHTML=originalArticleHTML;
-  const plain=article.textContent;
-  const normalized=data.marks.filter(m=>(m.passageId||'p01')===currentPassageId&&m.type!=='note').map(m=>{
+function applyMarksTo(root,scope){
+  if(!root)return;
+  const plain=root.textContent;
+  const normalized=data.marks.filter(m=>(m.scopeId===scope||(!m.scopeId&&scope===currentPassageId&&(m.passageId||'p01')===currentPassageId))&&m.type!=='note').map(m=>{
     let start=Number.isInteger(m.start)?m.start:plain.indexOf(m.text);
     if(m.text&&plain.slice(start,start+m.text.length)!==m.text)start=plain.indexOf(m.text);
-    let end=start+(m.text||'').length;
-    return {...m,start,end};
+    return {...m,start,end:start+(m.text||'').length};
   }).filter(m=>m.start>=0&&m.end>m.start&&m.end<=plain.length).sort((a,b)=>b.start-a.start);
   normalized.forEach(m=>{
-    const a=pointAtTextOffset(article,m.start),b=pointAtTextOffset(article,m.end);
-    if(!a||!b)return;
-    try{const r=document.createRange();r.setStart(a.node,a.offset);r.setEnd(b.node,b.offset);const mark=document.createElement('mark');mark.className=m.type==='evidence'?'evidence':m.type==='vocab'?'vocabmark':'highlight';mark.appendChild(r.extractContents());r.insertNode(mark)}catch(e){/* Ignore invalid or overlapping legacy ranges safely. */}
+    const a=pointAtTextOffset(root,m.start),b=pointAtTextOffset(root,m.end);if(!a||!b)return;
+    try{const r=document.createRange();r.setStart(a.node,a.offset);r.setEnd(b.node,b.offset);const mark=document.createElement('mark');mark.className=m.type==='evidence'?'evidence':m.type==='vocab'?'vocabmark':'highlight';mark.appendChild(r.extractContents());r.insertNode(mark)}catch(e){}
   });
 }
+function applyMarks(){
+  article.innerHTML=originalArticleHTML;
+  applyMarksTo(article,currentPassageId);
+}
+function findMarkableRoot(node){
+  const el=node&&node.nodeType===Node.ELEMENT_NODE?node:node?.parentElement;
+  return el?.closest('.article-text,.markable-text')||null;
+}
+function showMenu(){
+  const sel=window.getSelection();if(!sel||sel.isCollapsed||!sel.rangeCount)return;
+  const range=sel.getRangeAt(0),root=findMarkableRoot(range.commonAncestorContainer);
+  if(!root||!root.contains(range.startContainer)||!root.contains(range.endContainer))return;
+  const txt=sel.toString();if(!txt.trim())return;
+  savedSelection=txt;savedRange=range.cloneRange();savedRoot=root;savedScope=markScope(root);
+  const rect=range.getBoundingClientRect();menu.style.display='flex';
+  const menuWidth=Math.min(menu.offsetWidth||260,innerWidth-16);
+  menu.style.left=Math.max(8,Math.min(innerWidth-menuWidth-8,rect.left))+'px';
+  menu.style.top=Math.max(8,rect.top-48)+'px';
+}
+menu.addEventListener('pointerdown',e=>{if(e.target.closest('button'))e.preventDefault()});
+document.addEventListener('mouseup',()=>setTimeout(showMenu,0));
+document.addEventListener('touchend',()=>setTimeout(showMenu,350),{passive:true});
+document.addEventListener('click',e=>{if(!menu.contains(e.target))menu.style.display='none'});
 menu.querySelectorAll('button').forEach(b=>b.onclick=()=>{
-  const type=b.dataset.mark;if(!savedSelection)return;
+  const type=b.dataset.mark;if(!savedSelection||!savedRoot)return;
   if(type==='note'){
     const n=prompt('为这段文字添加笔记：');
-    if(n){data.marks.push({text:savedSelection,type,note:n,passageId:currentPassageId});toast('笔记已保存')}
+    if(n){data.marks.push({text:savedSelection,type,note:n,scopeId:savedScope,passageId:savedScope});toast('笔记已保存')}
   }else if(type==='vocab'){
     const w=savedSelection.split(/\n/)[0].slice(0,80);
     if(!data.vocab.some(x=>x.word===w))data.vocab.unshift({word:w,meaning:'',context:savedSelection});
     toast('已收藏到生词本');
   }else{
-    let start=savedRange?getTextOffset(savedRange.startContainer,savedRange.startOffset):-1;
-    let end=savedRange?getTextOffset(savedRange.endContainer,savedRange.endOffset):start+savedSelection.length;
-    data.marks.push({text:savedSelection,type,start,end,passageId:currentPassageId});
-    applyMarks();toast('标记已保存');
+    const start=getRootOffset(savedRoot,savedRange.startContainer,savedRange.startOffset);
+    const end=getRootOffset(savedRoot,savedRange.endContainer,savedRange.endOffset);
+    if(start>=0&&end>start)data.marks.push({text:savedSelection,type,start,end,scopeId:savedScope,passageId:savedScope});
+    applyMarksTo(savedRoot,savedScope);toast('标记已保存');
   }
-  save();menu.style.display='none';savedRange=null;window.getSelection()?.removeAllRanges();
+  save();menu.style.display='none';savedRange=null;savedRoot=null;window.getSelection()?.removeAllRanges();
 });
 applyMarks();
-document.getElementById('clearMarks').onclick=()=>{data.marks=[];save();applyMarks();toast('文字标记已清除')};
+document.getElementById('clearMarks').onclick=()=>{
+  data.marks=data.marks.filter(m=>m.scopeId?m.scopeId!==currentPassageId:((m.passageId||'p01')!==currentPassageId));
+  save();applyMarks();toast('当前文章的文字标记已清除');
+};
 // Drawing canvas with pointer support (Apple Pencil / touch / mouse).
 const canvas=document.getElementById('inkCanvas'),ctx=canvas.getContext('2d'),wrap=document.getElementById('articleScroll');let drawing=false,tool='pen',hidden=false,paths=[],redo=[];function resizeCanvas(){let rect=wrap.getBoundingClientRect(),dpr=devicePixelRatio||1;let old=canvas.width?canvas.toDataURL():null;canvas.width=rect.width*dpr;canvas.height=rect.height*dpr;canvas.style.width=rect.width+'px';canvas.style.height=rect.height+'px';ctx.setTransform(dpr,0,0,dpr,0,0);const savedInk=(data.inkByPassage&&data.inkByPassage[currentPassageId])||(currentPassageId==='p01'?data.ink:null);if(savedInk){try{let im=new Image();im.onload=()=>ctx.drawImage(im,0,0,rect.width,rect.height);im.src=savedInk}catch(e){}}}function saveInk(){data.ink=canvas.toDataURL('image/png');data.inkByPassage=data.inkByPassage||{};data.inkByPassage[currentPassageId]=data.ink;save()}function pos(e){let r=canvas.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top}}canvas.addEventListener('pointerdown',e=>{if(tool==='read')return;drawing=true;canvas.setPointerCapture(e.pointerId);let p=pos(e);paths.push({color:tool==='eraser'?'#ffffff':document.getElementById('penColor').value,size:tool==='eraser'?22:+document.getElementById('penSize').value,points:[p],erase:tool==='eraser'});redo=[];ctx.beginPath();ctx.moveTo(p.x,p.y)});canvas.addEventListener('pointermove',e=>{if(!drawing)return;let p=pos(e),path=paths[paths.length-1];path.points.push(p);ctx.globalCompositeOperation=path.erase?'destination-out':'source-over';ctx.strokeStyle=path.color;ctx.lineWidth=path.size;ctx.lineCap='round';ctx.lineJoin='round';ctx.lineTo(p.x,p.y);ctx.stroke()});function endDraw(){if(drawing){drawing=false;ctx.globalCompositeOperation='source-over';saveInk()}}canvas.addEventListener('pointerup',endDraw);canvas.addEventListener('pointercancel',endDraw);function redraw(){ctx.clearRect(0,0,canvas.width,canvas.height);let dpr=devicePixelRatio||1;ctx.save();ctx.setTransform(dpr,0,0,dpr,0,0);paths.forEach(p=>{ctx.beginPath();ctx.globalCompositeOperation=p.erase?'destination-out':'source-over';ctx.strokeStyle=p.color;ctx.lineWidth=p.size;ctx.lineCap='round';ctx.lineJoin='round';p.points.forEach((v,i)=>i?ctx.lineTo(v.x,v.y):ctx.moveTo(v.x,v.y));ctx.stroke()});ctx.restore();ctx.globalCompositeOperation='source-over';saveInk()}document.getElementById('modeRead').onclick=()=>{tool='read';canvas.style.pointerEvents='none';document.getElementById('modeRead').classList.add('selected');document.getElementById('modeDraw').classList.remove('selected')};document.getElementById('modeDraw').onclick=()=>{tool='pen';canvas.style.pointerEvents='auto';document.getElementById('modeDraw').classList.add('selected');document.getElementById('modeRead').classList.remove('selected')};document.getElementById('penBtn').onclick=()=>{tool='pen';canvas.style.pointerEvents='auto';toast('手写笔已启用')};document.getElementById('eraserBtn').onclick=()=>{tool='eraser';canvas.style.pointerEvents='auto';toast('橡皮擦已启用')};document.getElementById('undoBtn').onclick=()=>{if(paths.length){redo.push(paths.pop());redraw()}};document.getElementById('redoBtn').onclick=()=>{if(redo.length){paths.push(redo.pop());redraw()}};document.getElementById('clearInkBtn').onclick=()=>{if(confirm('清除全部手写笔迹？')){paths=[];redo=[];ctx.clearRect(0,0,canvas.width,canvas.height);saveInk()}};document.getElementById('hideInkBtn').onclick=()=>{hidden=!hidden;canvas.style.visibility=hidden?'hidden':'visible';document.getElementById('hideInkBtn').textContent=hidden?'显示笔迹':'隐藏笔迹'};setTimeout(resizeCanvas,100);window.addEventListener('resize',resizeCanvas);const initialInk=(data.inkByPassage&&data.inkByPassage[currentPassageId])||(currentPassageId==='p01'?data.ink:null);if(initialInk){let im=new Image();im.onload=()=>{let r=wrap.getBoundingClientRect();ctx.drawImage(im,0,0,r.width,r.height)};im.src=initialInk}
 // Draggable split divider.
@@ -429,7 +443,7 @@ function renderDailyPractice(p,source='demo'){
  activeDaily=p;dailySubmitted=false;
  document.getElementById('dailyDateTag').textContent=dailyDateKey()+' · JST';
  document.getElementById('dailyMeta').textContent=`${p.category||'IELTS Academic Reading'} · ${p.level||'Academic style'} · ${source==='backend'?'AI prepared':'内置示范文章'}`;
- document.getElementById('dailyArticle').innerHTML=`<h2 class="article-title">${dailyEscape(p.title)}</h2><div class="article-meta">IELTS Academic Reading · ${dailyEscape(p.level||'')} · Original practice</div>`+p.paragraphs.map((x,i)=>`<p><b>${String.fromCharCode(65+i)}.</b> ${dailyEscape(x)}</p>`).join('');
+ document.getElementById('dailyArticle').dataset.markScope='daily-'+dailyDateKey();document.getElementById('dailyArticle').innerHTML=`<h2 class="article-title">${dailyEscape(p.title)}</h2><div class="article-meta">IELTS Academic Reading · ${dailyEscape(p.level||'')} · Original practice</div>`+p.paragraphs.map((x,i)=>`<p><b>${String.fromCharCode(65+i)}.</b> ${dailyEscape(x)}</p>`).join('');applyMarksTo(document.getElementById('dailyArticle'),document.getElementById('dailyArticle').dataset.markScope);
  const wc=(p.paragraphs.join(' ').match(/\b[\w'-]+\b/g)||[]).length;
  document.getElementById('dailyWordCount').textContent=`约 ${wc} words`;
  document.getElementById('dailyQuestionCount').textContent=`${p.questions.length} questions`;
