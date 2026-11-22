@@ -678,6 +678,14 @@ function examPracticeHtml(p,index){
  const solutionPanel=p.solutionRaw?'<h4>答案解析 / Solutions</h4><p class="small">以下为配对导入的解析原文。OCR 可能存在错字，请以原 PDF 核对。</p><details open><summary>查看完整答案解析（'+p.solutionRaw.length+' 字符）</summary><pre style="white-space:pre-wrap;max-height:520px;overflow:auto">'+dailyEscape(p.solutionRaw)+'</pre></details>':'<div class="annotation">尚未绑定答案解析 PDF。可以删除后重新导入，或后续版本增加补充解析入口。</div>';
  return '<div class="card exam-practice" id="examPractice"><div class="section-head"><div><h3>答题模式 · '+dailyEscape(p.title)+'</h3><div class="small">选择题可在线作答；翻译和写作可在文本框中完成。</div></div><button data-exam-close>收起答题</button></div><div class="annotation">注意：导入只负责提取试卷内容。请先检查题干和选项是否完整。未识别的题目请对照下方原卷全文作答。</div><div class="exam-paper-questions">'+(rows||'<div class="empty">未识别到可交互的客观题，请检查原卷文本格式。</div>')+'</div><h4>翻译与写作</h4>'+(written||'<div class="small">暂未识别到第 46—52 题，请在原卷全文中完成。</div>')+solutionPanel+'<h4>答案 key（用于自动批改）</h4><p class="small">请将官方答案按每行一题填写，例如：1 B；2 D；41 F。也可以先完成答题，之后再补充答案 key。</p><textarea id="examAnswerKey" class="notes-area" rows="5" placeholder="1 B&#10;2 D&#10;3 A">'+dailyEscape(p.answerKey||'')+'</textarea><div class="toolrow" style="margin-top:10px"><button class="soft" data-exam-saveanswers>保存作答</button><button class="primary" data-exam-grade>提交并批改</button></div><div id="examGradeResult" class="result"></div><details style="margin-top:12px"><summary>查看导入的原卷全文</summary><pre style="white-space:pre-wrap;max-height:400px;overflow:auto">'+dailyEscape(p.raw)+'</pre></details></div>';
 }
+function getSolutionExcerpt(raw,number){
+ const text=String(raw||'');if(!text)return '';
+ const patterns=[new RegExp('第\\s*'+number+'\\s*题','i'),new RegExp('Question\\s*'+number+'\\b','i'),new RegExp('(?:^|\\n)\\s*'+number+'\\s*[、.)．:]','i')];
+ let at=-1;for(const re of patterns){const m=re.exec(text);if(m){at=m.index;break}}
+ if(at<0)return '';
+ const tail=text.slice(at),next=tail.slice(20).search(/(?:第\\s*\\d{1,2}\\s*题|Question\\s*\\d{1,2}\\b)/i);
+ return tail.slice(0,next>0?next+20:1800).trim();
+}
 function parseExamAnswerKey(raw){
  const map={};String(raw||'').split(/[\n;；,，]+/).forEach(line=>{const m=line.trim().match(/(?:第\s*)?(\d{1,2})\s*(?:题)?\s*[:：.、-]?\s*([A-G])\b/i);if(m)map[+m[1]]=m[2].toUpperCase()});
  return map;
@@ -696,7 +704,7 @@ function gradeExamAttempt(index){
  const missing=comparable.filter(n=>!answers[n]);
  const result=document.getElementById('examGradeResult');
  if(!comparable.length){result.innerHTML='<div class="annotation">还没有可识别的客观题答案 key。请先填写答案 key（如 1 B），保存后再批改。主观题需要人工核对。</div>';return}
- result.innerHTML='<div class="card"><b>批改结果</b><div class="stats" style="margin:10px 0"><div class="stat"><strong>'+correct.length+'/'+comparable.length+'</strong><span>正确题数 / 已录入答案 key</span></div><div class="stat"><strong>'+Math.round(correct.length/comparable.length*100)+'%</strong><span>客观题正确率</span></div><div class="stat"><strong>'+missing.length+'</strong><span>尚未作答</span></div></div><div class="small">本次自动批改范围：已录入答案 key 的第 1—45 题。翻译和写作不进行机械判分，请人工核对。</div><div class="listitem">'+comparable.map(n=>'<span style="display:inline-block;margin:3px 8px 3px 0">第 '+n+' 题：'+(answers[n]||'未答')+' / '+key[n]+' '+(answers[n]?(String(answers[n]).toUpperCase()===key[n]?'✓':'✗'):'')+'</span>').join('')+'</div></div>';
+ result.innerHTML='<div class="card"><b>批改结果</b><div class="stats" style="margin:10px 0"><div class="stat"><strong>'+correct.length+'/'+comparable.length+'</strong><span>正确题数 / 已录入答案 key</span></div><div class="stat"><strong>'+Math.round(correct.length/comparable.length*100)+'%</strong><span>客观题正确率</span></div><div class="stat"><strong>'+missing.length+'</strong><span>尚未作答</span></div></div><div class="small">本次自动批改范围：已录入答案 key 的第 1—45 题。翻译和写作不进行机械判分，请人工核对。</div><div class="listitem">'+comparable.map(n=>'<span style="display:inline-block;margin:3px 8px 3px 0">第 '+n+' 题：'+(answers[n]||'未答')+' / '+key[n]+' '+(answers[n]?(String(answers[n]).toUpperCase()===key[n]?'✓':'✗'):'')+'</span>').join('')+'</div>'+(p.solutionRaw?'<h4>逐题解析定位</h4>'+comparable.map(n=>{const ex=getSolutionExcerpt(p.solutionRaw,n);return ex?'<details><summary>第 '+n+' 题解析片段</summary><pre style="white-space:pre-wrap;max-height:300px;overflow:auto">'+dailyEscape(ex)+'</pre></details>':''}).join(''):'<div class="small">尚未导入解析文件。</div>')+'</div>';
  p.lastScore={correct:correct.length,total:comparable.length,at:new Date().toLocaleString('zh-CN')};save();
 }
 function renderExamSaved(){
