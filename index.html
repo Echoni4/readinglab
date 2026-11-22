@@ -531,16 +531,18 @@ function parseExamQuestions(raw){
  }
  flush();
  const best=new Map();for(const q of questions){const prior=best.get(q.number);const score=x=>Object.keys(x.options).length*100+x.stem.join(' ').length;if(!prior||score(q)>score(prior))best.set(q.number,q)}
- return [...best.values()].sort((a,b)=>a.number-b.number);
+ const groups=[...best.values()].sort((a,b)=>a.number-b.number);
+ for(const q of groups)q.kind=q.number<=20?'完形填空':q.number<=40?'阅读理解':q.number<=45?'新题型（匹配材料）':q.number<=50?'翻译句段':'写作任务';
+ return groups;
 }
 function examQuestionStats(questions){
- const ranges=[['完形填空',1,20],['阅读理解',21,40],['新题型',41,45],['翻译',46,50],['写作',51,52]];
+ const ranges=[['完形填空',1,20],['阅读理解',21,40],['新题型（匹配材料）',41,45],['翻译句段',46,50],['写作任务',51,52]];
  return ranges.map(([name,a,b])=>({name,found:questions.filter(q=>q.number>=a&&q.number<=b).length,total:b-a+1}));
 }
 function renderExamPreview(){
  const el=document.getElementById('examPreview'),raw=document.getElementById('examText').value,qs=parseExamQuestions(raw),stats=examQuestionStats(qs);
  const summary='<div class="card" style="margin:10px 0"><b>题目结构识别</b><div class="small">识别到 '+qs.length+' 个编号题目。以下为初步解析结果，请核对原文。</div><div class="toolrow" style="margin-top:8px">'+stats.map(s=>'<span class="tag">'+s.name+' '+s.found+'/'+s.total+'</span>').join('')+'</div></div>';
- const questionHtml=qs.length?'<div class="card"><b>题干与选项预览</b>'+qs.map(q=>'<div class="listitem"><b>第 '+q.number+' 题</b><div>'+dailyEscape(q.stem||'（题干可能位于上一行或正文中，需人工核对）')+'</div>'+Object.entries(q.options).map(([k,v])=>'<div class="small">['+k+'] '+dailyEscape(v)+'</div>').join('')+'</div>').join('')+'</div>':'<div class="empty">暂未识别到独立编号题目，请检查 PDF 提取文本的换行格式。</div>';
+ const questionHtml=qs.length?'<div class="card"><b>题干与选项预览</b>'+qs.map(q=>'<div class="listitem"><b>'+q.kind+' · 第 '+q.number+' 题</b><div>'+dailyEscape(q.stem||'（该编号可能是材料标记，需结合原文核对）')+'</div>'+Object.entries(q.options).map(([k,v])=>'<div class="small">['+k+'] '+dailyEscape(v)+'</div>').join('')+'</div>').join('')+'</div>':'<div class="empty">暂未识别到独立编号题目，请检查 PDF 提取文本的换行格式。</div>';
  const sections=parsedExamSections.length?parsedExamSections.map(s=>'<div class="listitem"><b>'+dailyEscape(s.title)+'</b><div class="small">'+s.content.length+' characters</div><pre style="white-space:pre-wrap;font:13px/1.6 inherit;background:#fff9fb;padding:10px;border-radius:9px;max-height:180px;overflow:auto">'+dailyEscape(s.content.slice(0,1800))+(s.content.length>1800?'\\n…（预览截断，保存时保留全文）':'')+'</pre></div>').join(''):'<div class="empty">未识别到试卷内容。</div>';
  el.innerHTML=summary+questionHtml+'<details style="margin-top:12px"><summary>查看分区识别结果</summary>'+sections+'</details>';
 }
