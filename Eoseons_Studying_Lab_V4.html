@@ -97,8 +97,14 @@
   <p class="small">支持可复制文字的 PDF、DOCX、TXT、Markdown，也可粘贴整套试卷。扫描版 PDF 需要 OCR，识别结果必须人工检查；旧版 .doc 请先另存为 .docx。</p>
   <div class="grid2"><div><label class="small" for="examTitle">试卷名称</label><input id="examTitle" class="field" placeholder="例如：2020 年考研英语一真题"></div><div><label class="small" for="examType">试卷类型</label><select id="examType" class="field"><option>考研英语一</option><option>考研英语二</option><option>自定义英语试卷</option></select></div></div>
   <label class="small" for="examFile">选择文件 / Upload a complete paper</label><input id="examFile" type="file" accept=".pdf,.docx,.txt,.md" class="field" style="margin:6px 0 12px">
-  <label class="small" for="examText">完整试卷文本（可编辑提取结果）</label><textarea id="examText" class="notes-area" rows="13" placeholder="粘贴完整试卷，建议保留题号、选项、文章、Section 标题和答案。"></textarea>
-  <div class="toolrow" style="margin-top:10px"><button class="soft" id="examParse">识别试卷结构</button><button class="primary" id="examSave">保存整套试卷</button></div>
+  <label class="small" for="examText">完整试卷文本（可编辑提取结果）</label><textarea id="examText" class="notes-area" rows="9" placeholder="粘贴完整试卷，建议保留题号、选项、文章、Section 标题和答案。"></textarea>
+  <div class="divider" style="margin:14px 0"></div>
+  <h3>② 同时导入答案与解析 / Answer & Solutions</h3>
+  <p class="small">可选择答案解析 PDF（包括扫描版）。网页会提取文字；扫描版会尝试逐页 OCR。识别后请检查文本，再保存配对。解析文件会与上方真题绑定。</p>
+  <label class="small" for="examSolutionFile">答案解析 PDF / DOCX / TXT</label><input id="examSolutionFile" type="file" accept=".pdf,.docx,.txt,.md" class="field" style="margin:6px 0 10px">
+  <div id="solutionStatus" class="annotation">尚未导入答案解析。可以只导入真题，也可以同时导入两份文件。</div>
+  <label class="small" for="examSolutionText">答案解析文本（OCR 结果可编辑）</label><textarea id="examSolutionText" class="notes-area" rows="8" placeholder="导入解析文件后，识别文本会显示在这里，可检查和修正。"></textarea>
+  <div class="toolrow" style="margin-top:10px"><button class="soft" id="examParse">识别试卷结构</button><button class="primary" id="examSave">保存真题与解析</button></div>
   <div id="examStatus" class="annotation">导入后先识别试卷模块并预览，确认结构后再保存；原始全文会一并保留。</div>
  </div>
  <div class="card" style="margin-top:14px"><h3>② 试卷结构预览</h3><div id="examPreview" class="empty">尚未导入试卷。</div></div>
@@ -610,39 +616,52 @@ function parseCurrentExam(){
 }
 document.getElementById('examParse').onclick=parseCurrentExam;
 document.getElementById('examFile').onchange=async e=>{
- const f=e.target.files[0];if(!f)return;const ext=f.name.split('.').pop().toLowerCase();document.getElementById('examStatus').textContent='正在提取文件文字…';
- try{
-  let raw='';
-  if(['txt','md'].includes(ext))raw=await f.text();
-  else if(ext==='docx'){
-   await loadExternalScript('https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js','mammoth');
-   const out=await window.mammoth.extractRawText({arrayBuffer:await f.arrayBuffer()});raw=out.value||'';
-  }else if(ext==='pdf'){
-   await loadExternalScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js','pdfjsLib');
-   window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-   const pdf=await window.pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise;let pages=[];
-   for(let n=1;n<=pdf.numPages;n++){
-    const page=await pdf.getPage(n),c=await page.getTextContent(),rows=[];
-    for(const item of c.items){
-     if(!item.str||!item.str.trim())continue;
-     const y=Math.round(item.transform?.[5]||0),x=item.transform?.[4]||0;
-     let row=rows.find(r=>Math.abs(r.y-y)<=2);
-     if(!row){row={y,items:[]};rows.push(row)}
-     row.items.push({x,str:item.str});
-    }
-    rows.sort((a,b)=>b.y-a.y);
-    const pageText=rows.map(row=>row.items.sort((a,b)=>a.x-b.x).map(v=>v.str).join(' ').replace(/\s+/g,' ').trim()).filter(Boolean).join('\n');
-    pages.push('[第'+n+'页]\n'+pageText);
-   }
-   raw=pages.join('\n\n');if(!raw.trim())throw new Error('该 PDF 可能是扫描图片版，未提取到可复制文字。请先 OCR 或手动粘贴文字。');
-  }else throw new Error('暂不支持此格式，请使用 PDF、DOCX、TXT 或 MD。');
-  document.getElementById('examTitle').value=f.name.replace(/\.[^.]+$/,'');document.getElementById('examText').value=raw;parseCurrentExam();
-  document.getElementById('examStatus').textContent='文件文字提取完成。请检查并编辑内容，再确认保存。';
- }catch(err){document.getElementById('examStatus').textContent='导入失败：'+err.message}
- e.target.value='';
+ const f=e.target.files[0];if(!f)return;const st=document.getElementById('examStatus');st.textContent='正在提取试卷文字…';
+ try{const raw=await extractExamFileText(f,st);document.getElementById('examTitle').value=f.name.replace(/\.[^.]+$/,'');document.getElementById('examText').value=raw;parseCurrentExam();st.textContent='试卷文字提取完成。请检查并编辑内容，再导入解析文件或保存。';}
+ catch(err){st.textContent='导入失败：'+err.message}e.target.value='';
 };
 
 let activeExamIndex=-1;
+async function extractExamFileText(file,statusEl){
+ const ext=file.name.split('.').pop().toLowerCase();
+ if(['txt','md'].includes(ext))return await file.text();
+ if(ext==='docx'){
+  await loadExternalScript('https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js','mammoth');
+  const out=await window.mammoth.extractRawText({arrayBuffer:await file.arrayBuffer()});return out.value||'';
+ }
+ if(ext!=='pdf')throw new Error('暂不支持此格式，请使用 PDF、DOCX、TXT 或 MD。');
+ await loadExternalScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js','pdfjsLib');
+ window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+ const pdf=await window.pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;let pages=[],hasText=0;
+ for(let n=1;n<=pdf.numPages;n++){
+  const page=await pdf.getPage(n),c=await page.getTextContent(),rows=[];
+  for(const item of c.items){if(!item.str||!item.str.trim())continue;const y=Math.round(item.transform?.[5]||0),x=item.transform?.[4]||0;let row=rows.find(r=>Math.abs(r.y-y)<=2);if(!row){row={y,items:[]};rows.push(row)}row.items.push({x,str:item.str})}
+  rows.sort((a,b)=>b.y-a.y);
+  const pageText=rows.map(row=>row.items.sort((a,b)=>a.x-b.x).map(v=>v.str).join(' ').replace(/\s+/g,' ').trim()).filter(Boolean).join('\n');
+  if(pageText.length>40)hasText++;
+  pages.push({page,pageText,n});
+ }
+ if(hasText>=Math.max(1,Math.ceil(pdf.numPages*.25)))return pages.map(x=>'[第'+x.n+'页]\n'+x.pageText).join('\n\n');
+ statusEl.textContent='检测到扫描版 PDF，正在加载 OCR 并逐页识别。页数较多时可能需要几分钟，请保持页面打开…';
+ await loadExternalScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js','Tesseract');
+ const worker=await window.Tesseract.createWorker('eng+chi_sim',1,{logger:m=>{if(m.status==='recognizing text')statusEl.textContent='OCR 识别第 '+(m.progress?Math.round(m.progress*100):'…')+'%（正在处理页面）';}});
+ const out=[];
+ try{
+  for(const item of pages){
+   if(item.pageText.length>40){out.push('[第'+item.n+'页]\n'+item.pageText);continue}
+   const viewport=item.page.getViewport({scale:1.7}),canvas=document.createElement('canvas');canvas.width=viewport.width;canvas.height=viewport.height;
+   await item.page.render({canvasContext:canvas.getContext('2d'),viewport}).promise;
+   const result=await worker.recognize(canvas);out.push('[第'+item.n+'页 OCR]\n'+(result.data.text||''));canvas.width=1;canvas.height=1;
+   statusEl.textContent='OCR 已完成 '+item.n+'/'+pdf.numPages+' 页…';
+  }
+ }finally{await worker.terminate()}
+ return out.join('\n\n');
+}
+document.getElementById('examSolutionFile').onchange=async e=>{
+ const f=e.target.files[0];if(!f)return;const st=document.getElementById('solutionStatus');st.textContent='正在读取答案解析…';
+ try{const raw=await extractExamFileText(f,st);document.getElementById('examSolutionText').value=raw;st.textContent='解析文件已提取 '+raw.length+' 个字符。请检查 OCR 结果，尤其是题号、选项字母和英文内容。';}
+ catch(err){st.textContent='解析导入失败：'+err.message}e.target.value='';
+};
 function examPracticeHtml(p,index){
  const qs=parseExamQuestions(p.raw||''),nt=parseNewTypeSection(p.raw||'');
  const objective=qs.filter(q=>q.number<=40);
@@ -656,7 +675,8 @@ function examPracticeHtml(p,index){
   return '<div class="listitem exam-question"><div><b>第 '+q.number+' 题 · '+dailyEscape(q.kind||'客观题')+'</b></div><p>'+dailyEscape(q.stem||'（题干未完整识别，请对照原卷）')+'</p>'+(keys.length?'<div class="exam-options">'+Object.entries(q.options).map(([k,v])=>'<div><b>['+k+']</b> '+dailyEscape(v)+'</div>').join('')+'</div>':'')+select+'</div>';
  }).join('');
  const written=subjective.map(q=>'<div class="listitem"><b>第 '+q.number+' 题 · '+dailyEscape(q.kind)+'</b><p>'+dailyEscape(q.stem||'写作/翻译任务，请对照原卷完成。')+'</p><textarea class="notes-area exam-written" data-q="'+q.number+'" rows="4" placeholder="在这里写下你的答案">'+dailyEscape((p.answers||{})[q.number]||'')+'</textarea></div>').join('');
- return '<div class="card exam-practice" id="examPractice"><div class="section-head"><div><h3>答题模式 · '+dailyEscape(p.title)+'</h3><div class="small">选择题可在线作答；翻译和写作可在文本框中完成。</div></div><button data-exam-close>收起答题</button></div><div class="annotation">注意：导入只负责提取试卷内容。请先检查题干和选项是否完整。未识别的题目请对照下方原卷全文作答。</div><div class="exam-paper-questions">'+(rows||'<div class="empty">未识别到可交互的客观题，请检查原卷文本格式。</div>')+'</div><h4>翻译与写作</h4>'+(written||'<div class="small">暂未识别到第 46—52 题，请在原卷全文中完成。</div>')+'<h4>答案 key（用于自动批改）</h4><p class="small">请将官方答案按每行一题填写，例如：1 B；2 D；41 F。也可以先完成答题，之后再补充答案 key。</p><textarea id="examAnswerKey" class="notes-area" rows="5" placeholder="1 B&#10;2 D&#10;3 A">'+dailyEscape(p.answerKey||'')+'</textarea><div class="toolrow" style="margin-top:10px"><button class="soft" data-exam-saveanswers>保存作答</button><button class="primary" data-exam-grade>提交并批改</button></div><div id="examGradeResult" class="result"></div><details style="margin-top:12px"><summary>查看导入的原卷全文</summary><pre style="white-space:pre-wrap;max-height:400px;overflow:auto">'+dailyEscape(p.raw)+'</pre></details></div>';
+ const solutionPanel=p.solutionRaw?'<h4>答案解析 / Solutions</h4><p class="small">以下为配对导入的解析原文。OCR 可能存在错字，请以原 PDF 核对。</p><details open><summary>查看完整答案解析（'+p.solutionRaw.length+' 字符）</summary><pre style="white-space:pre-wrap;max-height:520px;overflow:auto">'+dailyEscape(p.solutionRaw)+'</pre></details>':'<div class="annotation">尚未绑定答案解析 PDF。可以删除后重新导入，或后续版本增加补充解析入口。</div>';
+ return '<div class="card exam-practice" id="examPractice"><div class="section-head"><div><h3>答题模式 · '+dailyEscape(p.title)+'</h3><div class="small">选择题可在线作答；翻译和写作可在文本框中完成。</div></div><button data-exam-close>收起答题</button></div><div class="annotation">注意：导入只负责提取试卷内容。请先检查题干和选项是否完整。未识别的题目请对照下方原卷全文作答。</div><div class="exam-paper-questions">'+(rows||'<div class="empty">未识别到可交互的客观题，请检查原卷文本格式。</div>')+'</div><h4>翻译与写作</h4>'+(written||'<div class="small">暂未识别到第 46—52 题，请在原卷全文中完成。</div>')+solutionPanel+'<h4>答案 key（用于自动批改）</h4><p class="small">请将官方答案按每行一题填写，例如：1 B；2 D；41 F。也可以先完成答题，之后再补充答案 key。</p><textarea id="examAnswerKey" class="notes-area" rows="5" placeholder="1 B&#10;2 D&#10;3 A">'+dailyEscape(p.answerKey||'')+'</textarea><div class="toolrow" style="margin-top:10px"><button class="soft" data-exam-saveanswers>保存作答</button><button class="primary" data-exam-grade>提交并批改</button></div><div id="examGradeResult" class="result"></div><details style="margin-top:12px"><summary>查看导入的原卷全文</summary><pre style="white-space:pre-wrap;max-height:400px;overflow:auto">'+dailyEscape(p.raw)+'</pre></details></div>';
 }
 function parseExamAnswerKey(raw){
  const map={};String(raw||'').split(/[\n;；,，]+/).forEach(line=>{const m=line.trim().match(/(?:第\s*)?(\d{1,2})\s*(?:题)?\s*[:：.、-]?\s*([A-G])\b/i);if(m)map[+m[1]]=m[2].toUpperCase()});
@@ -692,7 +712,8 @@ document.getElementById('examSave').onclick=()=>{
  if(!title||!raw){toast('请填写试卷名称并导入内容');return}
  if(!parsedExamSections.length)parseCurrentExam();
  if(!confirm('确认保存这套完整试卷到本设备吗？请确保你有权保存和使用该资料。'))return;
- data.examPapers.unshift({id:Date.now(),title,type:document.getElementById('examType').value,raw,sections:parsedExamSections,savedAt:new Date().toLocaleString('zh-CN')});
+ const solutionRaw=document.getElementById('examSolutionText').value.trim();
+ data.examPapers.unshift({id:Date.now(),title,type:document.getElementById('examType').value,raw,solutionRaw,solutionName:document.getElementById('examSolutionFile').files[0]?.name||'',sections:parsedExamSections,savedAt:new Date().toLocaleString('zh-CN')});
  save();renderExamSaved();document.getElementById('examStatus').textContent='完整试卷已保存。原始全文与初步识别区块均已保留。';toast('完整试卷已保存');
 };
 renderExamSaved();
