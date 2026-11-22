@@ -525,12 +525,13 @@ function parseExamQuestions(raw){
  const optStart=/^\\s*[\\[［【(（]\\s*([A-GＡ-Ｇ])\\s*[\\]］】)）]\\s*(.*)$/i;
  for(const line of lines){
   const q=line.match(qStart),o=line.match(optStart);
-  if(q){const n=Number(q[1]||q[2]);if(n>=1&&n<=52){flush();current={number:n,stem:[q[3]||''],options:{}};continue}}
+  if(q){const n=Number(q[1]||q[2]);if(n>=1&&n<=52){flush();current={number:n,stem:[],options:{}};const rest=q[3]||'',inline=/[\\[［【(（]\\s*([A-GＡ-Ｇ])\\s*[\\]］】)）]\\s*([\\s\\S]*?)(?=[\\[［【(（]\\s*[A-GＡ-Ｇ]\\s*[\\]］】)）]|$)/gi;let m,last=0;while((m=inline.exec(rest))){const key=m[1].normalize('NFKC').toUpperCase();current.options[key]=[m[2].trim()];last=inline.lastIndex}if(last)current.stem.push(rest.slice(0,rest.search(/[\\[［【(（]\\s*[A-GＡ-Ｇ]/i)).trim());else current.stem.push(rest);continue}}
   if(current&&o){const key=o[1].normalize('NFKC').toUpperCase();current.options[key]=[o[2]||''];option=key;continue}
   if(current&&line.trim()){if(option)current.options[option].push(line.trim());else current.stem.push(line.trim())}
  }
  flush();
- return questions.sort((a,b)=>a.number-b.number);
+ const best=new Map();for(const q of questions){const prior=best.get(q.number);const score=x=>Object.keys(x.options).length*100+x.stem.join(' ').length;if(!prior||score(q)>score(prior))best.set(q.number,q)}
+ return [...best.values()].sort((a,b)=>a.number-b.number);
 }
 function examQuestionStats(questions){
  const ranges=[['完形填空',1,20],['阅读理解',21,40],['新题型',41,45],['翻译',46,50],['写作',51,52]];
