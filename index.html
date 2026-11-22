@@ -483,25 +483,39 @@ async function prepareDaily(force=false){
 document.getElementById('dailyRefresh').onclick=()=>prepareDaily(true);
 prepareDaily();
 
-// Full postgraduate paper import. Extracted text is preserved; detected sections are an editable first-pass aid.
+// Full postgraduate paper import. Keep original text while creating a more reliable editable outline.
 let parsedExamSections=[];
-function detectExamSections(raw){
- const patterns=[
+function normalizeExamText(raw){
+ return String(raw||'').normalize('NFKC').replace(/[\\u00a0\\u2007\\u202f]/g,' ').replace(/[\\t ]+\\n/g,'\\n').replace(/\\r\\n?/g,'\\n').replace(/\\n{3,}/g,'\\n\\n').trim();
+}
+function examHeading(line){
+ const t=line.trim();if(!t||t.length>140)return null;
+ const rules=[
+  ['答案与解析 / Answer Key',/(参考答案|答案解析|answer key|answers and explanations|suggested answers)/i],
   ['完形填空 / Use of English',/(完形填空|use of english|cloze test)/i],
-  ['阅读理解 / Reading Comprehension',/(阅读理解|reading comprehension|section ii)/i],
-  ['新题型 / New Question Types',/(新题型|new question types|matching information|paragraph matching)/i],
-  ['英译汉 / Translation',/(英译汉|translation|translate the following)/i],
-  ['写作 / Writing',/(写作|writing|essay|application letter)/i],
-  ['答案 / Answer Key',/(参考答案|答案解析|answer key|answers and explanations)/i]
+  ['阅读理解 Part A / Reading Comprehension',/(reading comprehension|阅读理解|part a)/i],
+  ['新题型 Part B / New Question Types',/(新题型|new question types|part b|matching information|paragraph matching)/i],
+  ['翻译 Part C / Translation',/(英译汉|translation|translate the following|part c)/i],
+  ['写作 / Writing',/(写作|writing|essay|application letter|section iii)/i]
  ];
- const lines=raw.split(/\r?\n/),sections=[];let current={title:'试卷正文 / General content',content:[]};
- for(const line of lines){
-  const match=patterns.find(x=>x[1].test(line.trim())&&line.trim().length<100);
-  if(match&&current.content.join('\n').trim()){sections.push({...current,content:current.content.join('\n').trim()});current={title:match[0],content:[line]};}
-  else if(match){current.title=match[0];current.content.push(line)}else current.content.push(line);
- }
- if(current.content.join('\n').trim())sections.push({...current,content:current.content.join('\n').trim()});
- return sections;
+ return rules.find(x=>x[1].test(t))||null;
+}
+function detectExamSections(raw){
+ const lines=normalizeExamText(raw).split('\\n'),sections=[];let current={title:'试卷正文 / General content',content:[]};
+ const flush=()=>{const content=current.content.join('\\n').trim();if(content)sections.push({title:current.title,content,characters:content.length,pageMarkers:(content.match(/\\[第\\d+页\\]/g)||[]).length});};
+ for(const line of lines){const heading=examHeading(line);if(heading){flush();current={title:heading[0],content:[line]};}else current.content.push(line)}
+ flush();return sections;
+}
+function summarizeExamStructure(raw){
+ const t=normalizeExamText(raw),checks=[
+  ['完形填空','(?:Questions?\\s*)?1\\s*(?:-|–|—|to)\\s*20|完形填空|Use of English'],
+  ['阅读理解','(?:Questions?\\s*)?21\\s*(?:-|–|—|to)\\s*40|Reading Comprehension'],
+  ['新题型','(?:Questions?\\s*)?41\\s*(?:-|–|—|to)\\s*45|New Question Types'],
+  ['翻译','(?:Questions?\\s*)?46\\s*(?:-|–|—|to)\\s*50|Translation'],
+  ['写作','(?:Questions?\\s*)?51\\s*(?:-|–|—|to)\\s*52|Writing'],
+  ['答案/解析','Answer Key|Answers and Explanations|参考答案|答案解析']
+ ];
+ return checks.filter(x=>new RegExp(x[1],'i').test(t)).map(x=>x[0]);
 }
 function renderExamPreview(){
  const el=document.getElementById('examPreview');
@@ -510,7 +524,7 @@ function renderExamPreview(){
 function parseCurrentExam(){
  const raw=document.getElementById('examText').value.trim();if(!raw){toast('请先上传文件或粘贴试卷内容');return false}
  parsedExamSections=detectExamSections(raw);renderExamPreview();
- document.getElementById('examStatus').textContent=`初步识别到 ${parsedExamSections.length} 个内容区块。请核对题号、选项、文章顺序和答案；扫描 PDF 可能需要 OCR。`;return true;
+ const found=summarizeExamStructure(raw);document.getElementById('examStatus').textContent=`初步识别到 ${parsedExamSections.length} 个内容区块。${found.length?' 检测到：'+found.join('、')+'。':' 暂未可靠识别全部题型标题。'} 请核对题号、选项和文章顺序；扫描 PDF 仍可能需要 OCR。`;return true;
 }
 document.getElementById('examParse').onclick=parseCurrentExam;
 document.getElementById('examFile').onchange=async e=>{
@@ -525,8 +539,20 @@ document.getElementById('examFile').onchange=async e=>{
    await loadExternalScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js','pdfjsLib');
    window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
    const pdf=await window.pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise;let pages=[];
-   for(let n=1;n<=pdf.numPages;n++){const page=await pdf.getPage(n),c=await page.getTextContent();pages.push(c.items.map(x=>x.str).join(' '))}
-   raw=pages.join('\n\n');if(!raw.trim())throw new Error('该 PDF 可能是扫描图片版，未提取到可复制文字。请先 OCR 或手动粘贴文字。');
+   for(let n=1;n<=pdf.numPages;n++){
+    const page=await pdf.getPage(n),c=await page.getTextContent(),rows=[];
+    for(const item of c.items){
+     if(!item.str||!item.str.trim())continue;
+     const y=Math.round(item.transform?.[5]||0),x=item.transform?.[4]||0;
+     let row=rows.find(r=>Math.abs(r.y-y)<=2);
+     if(!row){row={y,items:[]};rows.push(row)}
+     row.items.push({x,str:item.str});
+    }
+    rows.sort((a,b)=>b.y-a.y);
+    const pageText=rows.map(row=>row.items.sort((a,b)=>a.x-b.x).map(v=>v.str).join(' ').replace(/\\s+/g,' ').trim()).filter(Boolean).join('\\n');
+    pages.push('[第'+n+'页]\\n'+pageText);
+   }
+   raw=pages.join('\\n\\n');if(!raw.trim())throw new Error('该 PDF 可能是扫描图片版，未提取到可复制文字。请先 OCR 或手动粘贴文字。');
   }else throw new Error('暂不支持此格式，请使用 PDF、DOCX、TXT 或 MD。');
   document.getElementById('examTitle').value=f.name.replace(/\.[^.]+$/,'');document.getElementById('examText').value=raw;parseCurrentExam();
   document.getElementById('examStatus').textContent='文件文字提取完成。请检查并编辑内容，再确认保存。';
