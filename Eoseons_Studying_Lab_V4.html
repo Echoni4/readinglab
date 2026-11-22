@@ -659,7 +659,7 @@ function examPracticeHtml(p,index){
  return '<div class="card exam-practice" id="examPractice"><div class="section-head"><div><h3>答题模式 · '+dailyEscape(p.title)+'</h3><div class="small">选择题可在线作答；翻译和写作可在文本框中完成。</div></div><button data-exam-close>收起答题</button></div><div class="annotation">注意：导入只负责提取试卷内容。请先检查题干和选项是否完整。未识别的题目请对照下方原卷全文作答。</div><div class="exam-paper-questions">'+(rows||'<div class="empty">未识别到可交互的客观题，请检查原卷文本格式。</div>')+'</div><h4>翻译与写作</h4>'+(written||'<div class="small">暂未识别到第 46—52 题，请在原卷全文中完成。</div>')+'<h4>答案 key（用于自动批改）</h4><p class="small">请将官方答案按每行一题填写，例如：1 B；2 D；41 F。也可以先完成答题，之后再补充答案 key。</p><textarea id="examAnswerKey" class="notes-area" rows="5" placeholder="1 B&#10;2 D&#10;3 A">'+dailyEscape(p.answerKey||'')+'</textarea><div class="toolrow" style="margin-top:10px"><button class="soft" data-exam-saveanswers>保存作答</button><button class="primary" data-exam-grade>提交并批改</button></div><div id="examGradeResult" class="result"></div><details style="margin-top:12px"><summary>查看导入的原卷全文</summary><pre style="white-space:pre-wrap;max-height:400px;overflow:auto">'+dailyEscape(p.raw)+'</pre></details></div>';
 }
 function parseExamAnswerKey(raw){
- const map={};String(raw||'').split(/[\\n;；,，]+/).forEach(line=>{const m=line.trim().match(/(?:第\\s*)?(\\d{1,2})\\s*(?:题)?\\s*[:：.、-]?\\s*([A-G])\\b/i);if(m)map[+m[1]]=m[2].toUpperCase()});
+ const map={};String(raw||'').split(/[\n;；,，]+/).forEach(line=>{const m=line.trim().match(/(?:第\s*)?(\d{1,2})\s*(?:题)?\s*[:：.、-]?\s*([A-G])\b/i);if(m)map[+m[1]]=m[2].toUpperCase()});
  return map;
 }
 function saveExamAttempt(index){
