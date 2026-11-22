@@ -10,7 +10,7 @@
 </style></head>
 <body><div class="shell">
 <header><div class="brand"><div class="mark">✿</div><div><h1>Eoseons Studying Lab</h1><small>LEARN · EXPLORE · IMPROVE</small></div></div><div class="header-actions"><button id="exportBtn">导出学习备份</button><button id="importBtn">导入备份</button><input id="importFile" type="file" accept="application/json" hidden></div></header>
-<section class="hero"><div class="eyebrow">YOUR LITTLE LEARNING CORNER</div><h2>A little progress every day.</h2><p id="pA" data-paragraph="A">20 篇原创 IELTS 阅读练习，配套多题型、中文解析与原文证据。</p></section>
+<section class="hero"><div class="eyebrow">YOUR LITTLE LEARNING CORNER</div><h2>A little progress every day.</h2></section>
 <nav class="nav" aria-label="Main navigation"><button class="active" data-tab="home" data-group="home">⌂ Home · 学习首页</button><button data-tab="daily" data-group="practice">✎ Practice · 练习中心</button><button data-tab="library" data-group="library">♡ My Library · 我的资料库</button><button data-tab="history" data-group="progress">▤ My Progress · 学习进度</button></nav>
 <section class="panel active" id="home">
  <div class="stats">
@@ -48,7 +48,7 @@
  </div>
 </section>
 
-<section class="panel" id="ielts"><div class="section-head"><div><h3>IELTS Reading Practice</h3><div class="small">20 篇原创文章 · 多题型训练 · 阅读与答题分栏</div></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label class="small" for="passageSelect">选择文章</label><select id="passageSelect" class="field" style="max-width:300px"></select><span class="tag">20 Original Passages</span></div></div>
+<section class="panel" id="ielts"><div class="section-head"><div><h3>IELTS Reading Practice</h3><div class="small">阅读练习 · 多题型训练 · 阅读与答题分栏</div></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label class="small" for="passageSelect">选择文章</label><select id="passageSelect" class="field" style="max-width:300px"></select></div></div>
 <div class="toolrow" style="margin-bottom:10px"><button class="selected" id="modeRead">阅读标记模式</button><button id="modeDraw">✎ 手写模式</button><button id="penBtn" class="soft">手写笔</button><button id="eraserBtn">橡皮擦</button><button id="undoBtn">撤销</button><button id="redoBtn">恢复</button><button id="hideInkBtn">隐藏笔迹</button><label class="small">颜色 <input type="color" id="penColor" value="#d47b9b"></label><label class="small">粗细 <input type="range" id="penSize" min="1" max="12" value="3"></label><button id="clearInkBtn">清除笔迹</button></div>
 <div class="card navigator-card" style="margin-bottom:12px;padding:12px 15px"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><b>Reading Navigator · 段落导航</b><span class="small">点击段落快速定位；完成题目后可勾选进度</span></div><div class="paragraph-nav" id="paragraphNav" style="display:flex;gap:7px;flex-wrap:wrap;margin:10px 0"><button type="button" data-jump="pA">A · 段落 1</button><button type="button" data-jump="pB">B · 段落 2</button><button type="button" data-jump="pC">C · 段落 3</button><button type="button" data-jump="pD">D · 段落 4</button></div><div class="small" id="trackerText">Question Tracker：0 / 7 已完成</div><div class="tracker" id="questionTracker" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:7px"></div></div>
 <div class="workspace" id="workspace"><div class="pane reading" id="readingPane"><div class="pane-head"><b>PASSAGE · 原文</b><div class="toolrow"><button class="soft" id="clearMarks">清除文字标记</button></div></div><div class="pane-body canvas-wrap" id="articleScroll"><article class="article-text" id="articleText"><h2 class="article-title">Small Urban Gardens</h2><div class="article-meta">Practice 01 · Environment · 约 260 words</div><p id="pD" data-paragraph="D">In many cities, small gardens are becoming a familiar sight. They can be found on balconies, beside apartment buildings and even on the roofs of offices. Although these spaces are often limited in size, they can make a meaningful difference to urban life.</p><p id="pE" data-paragraph="E">One clear benefit is that gardens give residents access to fresh plants and, in some cases, vegetables. People who grow their own food may become more interested in how it is produced. However, urban gardening is not always a simple way to reduce household costs. Soil, containers and tools can be expensive, especially for beginners.</p><p>Gardens can also create opportunities for neighbours to meet. In a shared space, people of different ages may exchange advice and work together. This social benefit is sometimes more important to residents than the food they produce. A community garden, for example, can become a place where people feel connected to their neighbourhood.</p><p>There are challenges, too. Plants need regular care, and some rooftops may not receive enough sunlight. Water access can also be a problem. For this reason, successful projects usually begin with a careful plan and the support of the people who will use the space.</p><p>Urban gardens will not solve every environmental problem. Nevertheless, when they are designed realistically and maintained over time, they can improve local spaces and encourage people to take a greater interest in their surroundings.</p></article><canvas id="inkCanvas" style="pointer-events:none"></canvas></div></div><div class="divider-drag" id="dragDivider" title="拖动调整栏宽"></div><div class="pane questions"><div class="pane-head"><b>QUESTIONS 1–5 · 混合题型</b><span class="small" id="progressText">尚未作答</span></div><div class="pane-body"><p class="small">每篇包含 5 道混合题型练习；提交后显示答案、中文解析与原文证据。</p><div id="questionList"></div><button class="primary" id="submitQuiz">提交答案 / Check answers</button><div class="result" id="quizResult"></div><div style="margin-top:18px"><b>My notes · 阅读笔记</b><textarea id="readingNotes" class="notes-area" placeholder="记录文章主旨、定位线索或不理解的句子……"></textarea><div class="small">笔记会自动保存。</div></div></div></div></div>
@@ -641,12 +641,52 @@ document.getElementById('examFile').onchange=async e=>{
  }catch(err){document.getElementById('examStatus').textContent='导入失败：'+err.message}
  e.target.value='';
 };
+
+let activeExamIndex=-1;
+function examPracticeHtml(p,index){
+ const qs=parseExamQuestions(p.raw||''),nt=parseNewTypeSection(p.raw||'');
+ const objective=qs.filter(q=>q.number<=40);
+ const matching=nt.items.map(x=>({number:x.number,stem:(x.name?x.name+'：':'')+x.content,options:Object.fromEntries(nt.choices.map(c=>[c.label,c.content])),kind:'新题型匹配'}));
+ const all=[...objective,...matching].sort((a,b)=>a.number-b.number);
+ const subjective=qs.filter(q=>q.number>=46);
+ const rows=all.map(q=>{
+  const keys=Object.keys(q.options||{});
+  const opts=q.number>=41?['A','B','C','D','E','F','G']:keys;
+  const select='<select class="field exam-answer" data-q="'+q.number+'"><option value="">选择答案</option>'+opts.map(k=>'<option value="'+k+'" '+((p.answers||{})[q.number]===k?'selected':'')+'>'+k+'</option>').join('')+'</select>';
+  return '<div class="listitem exam-question"><div><b>第 '+q.number+' 题 · '+dailyEscape(q.kind||'客观题')+'</b></div><p>'+dailyEscape(q.stem||'（题干未完整识别，请对照原卷）')+'</p>'+(keys.length?'<div class="exam-options">'+Object.entries(q.options).map(([k,v])=>'<div><b>['+k+']</b> '+dailyEscape(v)+'</div>').join('')+'</div>':'')+select+'</div>';
+ }).join('');
+ const written=subjective.map(q=>'<div class="listitem"><b>第 '+q.number+' 题 · '+dailyEscape(q.kind)+'</b><p>'+dailyEscape(q.stem||'写作/翻译任务，请对照原卷完成。')+'</p><textarea class="notes-area exam-written" data-q="'+q.number+'" rows="4" placeholder="在这里写下你的答案">'+dailyEscape((p.answers||{})[q.number]||'')+'</textarea></div>').join('');
+ return '<div class="card exam-practice" id="examPractice"><div class="section-head"><div><h3>答题模式 · '+dailyEscape(p.title)+'</h3><div class="small">选择题可在线作答；翻译和写作可在文本框中完成。</div></div><button data-exam-close>收起答题</button></div><div class="annotation">注意：导入只负责提取试卷内容。请先检查题干和选项是否完整。未识别的题目请对照下方原卷全文作答。</div><div class="exam-paper-questions">'+(rows||'<div class="empty">未识别到可交互的客观题，请检查原卷文本格式。</div>')+'</div><h4>翻译与写作</h4>'+(written||'<div class="small">暂未识别到第 46—52 题，请在原卷全文中完成。</div>')+'<h4>答案 key（用于自动批改）</h4><p class="small">请将官方答案按每行一题填写，例如：1 B；2 D；41 F。也可以先完成答题，之后再补充答案 key。</p><textarea id="examAnswerKey" class="notes-area" rows="5" placeholder="1 B&#10;2 D&#10;3 A">'+dailyEscape(p.answerKey||'')+'</textarea><div class="toolrow" style="margin-top:10px"><button class="soft" data-exam-saveanswers>保存作答</button><button class="primary" data-exam-grade>提交并批改</button></div><div id="examGradeResult" class="result"></div><details style="margin-top:12px"><summary>查看导入的原卷全文</summary><pre style="white-space:pre-wrap;max-height:400px;overflow:auto">'+dailyEscape(p.raw)+'</pre></details></div>';
+}
+function parseExamAnswerKey(raw){
+ const map={};String(raw||'').split(/[\\n;；,，]+/).forEach(line=>{const m=line.trim().match(/(?:第\\s*)?(\\d{1,2})\\s*(?:题)?\\s*[:：.、-]?\\s*([A-G])\\b/i);if(m)map[+m[1]]=m[2].toUpperCase()});
+ return map;
+}
+function saveExamAttempt(index){
+ const p=data.examPapers[index];if(!p)return;
+ const answers={...(p.answers||{})};
+ document.querySelectorAll('#examPractice .exam-answer,#examPractice .exam-written').forEach(el=>{answers[+el.dataset.q]=el.value.trim()});
+ p.answers=answers;p.answerKey=document.getElementById('examAnswerKey')?.value||p.answerKey||'';
+ save();
+}
+function gradeExamAttempt(index){
+ saveExamAttempt(index);
+ const p=data.examPapers[index],key=parseExamAnswerKey(p.answerKey),answers=p.answers||{};
+ const comparable=Object.keys(key).filter(n=>+n<=45),done=comparable.filter(n=>answers[n]),correct=comparable.filter(n=>String(answers[n]||'').toUpperCase()===key[n]);
+ const missing=comparable.filter(n=>!answers[n]);
+ const result=document.getElementById('examGradeResult');
+ if(!comparable.length){result.innerHTML='<div class="annotation">还没有可识别的客观题答案 key。请先填写答案 key（如 1 B），保存后再批改。主观题需要人工核对。</div>';return}
+ result.innerHTML='<div class="card"><b>批改结果</b><div class="stats" style="margin:10px 0"><div class="stat"><strong>'+correct.length+'/'+comparable.length+'</strong><span>正确题数 / 已录入答案 key</span></div><div class="stat"><strong>'+Math.round(correct.length/comparable.length*100)+'%</strong><span>客观题正确率</span></div><div class="stat"><strong>'+missing.length+'</strong><span>尚未作答</span></div></div><div class="small">本次自动批改范围：已录入答案 key 的第 1—45 题。翻译和写作不进行机械判分，请人工核对。</div><div class="listitem">'+comparable.map(n=>'<span style="display:inline-block;margin:3px 8px 3px 0">第 '+n+' 题：'+(answers[n]||'未答')+' / '+key[n]+' '+(answers[n]?(String(answers[n]).toUpperCase()===key[n]?'✓':'✗'):'')+'</span>').join('')+'</div></div>';
+ p.lastScore={correct:correct.length,total:comparable.length,at:new Date().toLocaleString('zh-CN')};save();
+}
 function renderExamSaved(){
  const el=document.getElementById('examSavedList');
- el.innerHTML=data.examPapers.length?data.examPapers.map((p,i)=>`<div class="listitem"><b>${dailyEscape(p.title)}</b> <span class="tag">${dailyEscape(p.type)}</span><div class="small">${dailyEscape(p.savedAt)} · ${p.sections.length} 个识别区块 · ${p.raw.length} 字符</div><div class="toolrow"><button data-exam-open="${i}">打开全文</button><button data-exam-delete="${i}">删除</button></div><pre data-exam-content="${i}" style="display:none;white-space:pre-wrap;max-height:360px;overflow:auto;background:#fff9fb;padding:12px;border-radius:10px">${dailyEscape(p.raw)}</pre></div>`).join(''):'<div class="empty">还没有保存完整试卷。</div>';
- el.querySelectorAll('[data-exam-open]').forEach(b=>b.onclick=()=>{const pre=el.querySelector(`[data-exam-content="${b.dataset.examOpen}"]`);pre.style.display=pre.style.display==='none'?'block':'none';b.textContent=pre.style.display==='none'?'打开全文':'收起全文'});
+ el.innerHTML=data.examPapers.length?data.examPapers.map((p,i)=>'<div class="listitem"><b>'+dailyEscape(p.title)+'</b> <span class="tag">'+dailyEscape(p.type)+'</span><div class="small">'+dailyEscape(p.savedAt)+' · '+p.sections.length+' 个识别区块 · '+p.raw.length+' 字符'+(p.lastScore?' · 最近 '+p.lastScore.correct+'/'+p.lastScore.total:'')+'</div><div class="toolrow"><button data-exam-practice="'+i+'" class="primary">进入答题模式</button><button data-exam-open="'+i+'">查看原文</button><button data-exam-delete="'+i+'">删除</button></div><pre data-exam-content="'+i+'" style="display:none;white-space:pre-wrap;max-height:360px;overflow:auto;background:#fff9fb;padding:12px;border-radius:10px">'+dailyEscape(p.raw)+'</pre></div>').join(''):'<div class="empty">还没有保存完整试卷。</div>';
+ el.querySelectorAll('[data-exam-practice]').forEach(b=>b.onclick=()=>{activeExamIndex=+b.dataset.examPractice;const p=data.examPapers[activeExamIndex];el.querySelectorAll('.exam-practice').forEach(x=>x.remove());b.closest('.listitem').insertAdjacentHTML('afterend',examPracticeHtml(p,activeExamIndex));const box=document.getElementById('examPractice');box.querySelector('[data-exam-close]').onclick=()=>box.remove();box.querySelector('[data-exam-saveanswers]').onclick=()=>{saveExamAttempt(activeExamIndex);toast('作答已保存')};box.querySelector('[data-exam-grade]').onclick=()=>gradeExamAttempt(activeExamIndex)});
+ el.querySelectorAll('[data-exam-open]').forEach(b=>b.onclick=()=>{const pre=el.querySelector('[data-exam-content="'+b.dataset.examOpen+'"]');pre.style.display=pre.style.display==='none'?'block':'none';b.textContent=pre.style.display==='none'?'查看原文':'收起原文'});
  el.querySelectorAll('[data-exam-delete]').forEach(b=>b.onclick=()=>{if(confirm('确定删除这套试卷吗？')){data.examPapers.splice(+b.dataset.examDelete,1);save();renderExamSaved()}});
 }
+
 document.getElementById('examSave').onclick=()=>{
  const title=document.getElementById('examTitle').value.trim(),raw=document.getElementById('examText').value.trim();
  if(!title||!raw){toast('请填写试卷名称并导入内容');return}
