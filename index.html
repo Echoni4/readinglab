@@ -486,7 +486,7 @@ prepareDaily();
 // Full postgraduate paper import. Keep original text while creating a more reliable editable outline.
 let parsedExamSections=[];
 function normalizeExamText(raw){
- return String(raw||'').normalize('NFKC').replace(/[\\u00a0\\u2007\\u202f]/g,' ').replace(/[\\t ]+\\n/g,'\\n').replace(/\\r\\n?/g,'\\n').replace(/\\n{3,}/g,'\\n\\n').trim();
+ return String(raw||'').normalize('NFKC').replace(/[\u00a0\u2007\u202f]/g,' ').replace(/[\t ]+\n/g,'\n').replace(/\r\n?/g,'\n').replace(/\n{3,}/g,'\n\n').trim();
 }
 function examHeading(line){
  const t=line.trim();if(!t||t.length>140)return null;
@@ -501,18 +501,18 @@ function examHeading(line){
  return rules.find(x=>x[1].test(t))||null;
 }
 function detectExamSections(raw){
- const lines=normalizeExamText(raw).split('\\n'),sections=[];let current={title:'试卷正文 / General content',content:[]};
- const flush=()=>{const content=current.content.join('\\n').trim();if(content)sections.push({title:current.title,content,characters:content.length,pageMarkers:(content.match(/\\[第\\d+页\\]/g)||[]).length});};
+ const lines=normalizeExamText(raw).split('\n'),sections=[];let current={title:'试卷正文 / General content',content:[]};
+ const flush=()=>{const content=current.content.join('\n').trim();if(content)sections.push({title:current.title,content,characters:content.length,pageMarkers:(content.match(/\[第\d+页\]/g)||[]).length});};
  for(const line of lines){const heading=examHeading(line);if(heading){flush();current={title:heading[0],content:[line]};}else current.content.push(line)}
  flush();return sections;
 }
 function summarizeExamStructure(raw){
  const t=normalizeExamText(raw),checks=[
-  ['完形填空','(?:Questions?\\s*)?1\\s*(?:-|–|—|to)\\s*20|完形填空|Use of English'],
-  ['阅读理解','(?:Questions?\\s*)?21\\s*(?:-|–|—|to)\\s*40|Reading Comprehension'],
-  ['新题型','(?:Questions?\\s*)?41\\s*(?:-|–|—|to)\\s*45|New Question Types'],
-  ['翻译','(?:Questions?\\s*)?46\\s*(?:-|–|—|to)\\s*50|Translation'],
-  ['写作','(?:Questions?\\s*)?51\\s*(?:-|–|—|to)\\s*52|Writing'],
+  ['完形填空','(?:Questions?\s*)?1\s*(?:-|–|—|to)\s*20|完形填空|Use of English'],
+  ['阅读理解','(?:Questions?\s*)?21\s*(?:-|–|—|to)\s*40|Reading Comprehension'],
+  ['新题型','(?:Questions?\s*)?41\s*(?:-|–|—|to)\s*45|New Question Types'],
+  ['翻译','(?:Questions?\s*)?46\s*(?:-|–|—|to)\s*50|Translation'],
+  ['写作','(?:Questions?\s*)?51\s*(?:-|–|—|to)\s*52|Writing'],
   ['答案/解析','Answer Key|Answers and Explanations|参考答案|答案解析']
  ];
  return checks.filter(x=>new RegExp(x[1],'i').test(t)).map(x=>x[0]);
@@ -549,10 +549,10 @@ document.getElementById('examFile').onchange=async e=>{
      row.items.push({x,str:item.str});
     }
     rows.sort((a,b)=>b.y-a.y);
-    const pageText=rows.map(row=>row.items.sort((a,b)=>a.x-b.x).map(v=>v.str).join(' ').replace(/\\s+/g,' ').trim()).filter(Boolean).join('\\n');
-    pages.push('[第'+n+'页]\\n'+pageText);
+    const pageText=rows.map(row=>row.items.sort((a,b)=>a.x-b.x).map(v=>v.str).join(' ').replace(/\s+/g,' ').trim()).filter(Boolean).join('\n');
+    pages.push('[第'+n+'页]\n'+pageText);
    }
-   raw=pages.join('\\n\\n');if(!raw.trim())throw new Error('该 PDF 可能是扫描图片版，未提取到可复制文字。请先 OCR 或手动粘贴文字。');
+   raw=pages.join('\n\n');if(!raw.trim())throw new Error('该 PDF 可能是扫描图片版，未提取到可复制文字。请先 OCR 或手动粘贴文字。');
   }else throw new Error('暂不支持此格式，请使用 PDF、DOCX、TXT 或 MD。');
   document.getElementById('examTitle').value=f.name.replace(/\.[^.]+$/,'');document.getElementById('examText').value=raw;parseCurrentExam();
   document.getElementById('examStatus').textContent='文件文字提取完成。请检查并编辑内容，再确认保存。';
